@@ -31,8 +31,22 @@ jobs:
 
       - name: isort
         if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: olance/isort-action@v1.0.0
+        with:
+          args: .
+      - name: Check for modified files
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        id: git-check
+        run: echo ::set-output name=modified::$(if git diff-index --quiet HEAD --; then echo "false"; else echo "true"; fi)
+      - name: Push changes
+        if: github.event.pull_request.head.repo.full_name == github.repository && steps.git-check.outputs.modified == 'true'
         run: |
-            isort **/*.py
+            git config --global user.name 'Daniel Hoyer'
+            git config --global user.email 'mail@dahoiv.net'
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
+            git checkout $GITHUB_HEAD_REF
+            git commit -am "fixup! Isort"
+            git push
       - name: black
         if: github.event.pull_request.head.repo.full_name == github.repository
         uses: lgeiger/black-action@master
