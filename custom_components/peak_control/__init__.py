@@ -1,26 +1,19 @@
-"""light peak control component."""
-import datetime
+"""light trigger component."""
 import logging
-from collections import deque
 from datetime import timedelta
 
-import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
-from homeassistant.components.recorder.models import States
-from homeassistant.components.recorder.util import execute, session_scope
+import voluptuous as vol
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_START,
     SERVICE_TURN_OFF,
     SERVICE_TURN_ON,
 )
 from homeassistant.core import callback
-from homeassistant.util import dt as dt_util
 from homeassistant.helpers.event import (
-    track_state_change,
     async_track_state_change,
-    async_track_time_change,
 )
-from homeassistant.helpers.config_validation import PLATFORM_SCHEMA
+from homeassistant.util import dt as dt_util
 
 DOMAIN = "peak_control"
 STOPPED_DEVICES = "stopped_devices"
@@ -91,7 +84,7 @@ def setup(hass, config):
                     continue
                 state = hass.data[STOPPED_DEVICES].pop(entity_id)
 
-                _LOGGER.debug("Restore %s %s %s", name, dev_effect, entity_id)
+                _LOGGER.debug("Restore %s", entity_id)
                 if "climate" in entity_id:
                     _data = {
                         "entity_id": entity_id,
@@ -121,7 +114,7 @@ def setup(hass, config):
             if entity_id in hass.data[STOPPED_DEVICES]:
                 continue
 
-            _LOGGER.debug("Turn down %s %s %s", name, dev_effect, entity_id)
+            _LOGGER.debug("Turn down %s", entity_id)
             if "climate" in entity_id:
                 _data = {"entity_id": entity_id, "temperature": 10}
                 hass.data[STOPPED_DEVICES][entity_id] = hass.states.get(entity_id)
