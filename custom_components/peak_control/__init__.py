@@ -54,7 +54,7 @@ def setup(hass, config):
         """Return data of entity map to store in a file."""
         return hass.data[STOPPED_DEVICES]
 
-    async def _activate(_, _, new_state):
+    async def _activate(_, __, new_state):
 
         now = dt_util.now()
         if now.minute < 10:
