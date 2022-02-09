@@ -36,7 +36,7 @@ jobs:
           args: .
       - name: Check for modified files
         if: github.event.pull_request.head.repo.full_name == github.repository
-        id: git-check
+        id: git-check-isort
         run: echo ::set-output name=modified::$(if git diff-index --quiet HEAD --; then echo "false"; else echo "true"; fi)
       - name: Push changes
         if: github.event.pull_request.head.repo.full_name == github.repository && steps.git-check.outputs.modified == 'true'
