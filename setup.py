@@ -10,15 +10,15 @@ with pathlib.Path("requirements.txt").open() as requirements_txt:
     ]
 
 setup(
-    name="NAME",
-    packages=["NAME"],
+    name="Peak Control",
+    packages=["peak_control"],
     install_requires=install_requires,
     version="0.0.1",
-    description="A python3 library to communicate with XXXXX",
+    description="Home Assistant component to do peak consumption control",
     python_requires=">=3.9.0",
     author="Daniel Hjelseth Høyer",
     author_email="mail@dahoiv.net",
-    url="https://github.com/Danielhiversen/pyTemplate",
+    url="https://github.com/Danielhiversen/home_assistant_peak_control",
     license="MIT",
     classifiers=[
         "Intended Audience :: Developers",
