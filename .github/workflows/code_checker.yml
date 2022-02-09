@@ -27,7 +27,7 @@ jobs:
           key: pip_cache
       - name: Install depencency
         run: |
-            pip install dlint flake8 flake8-bandit flake8-bugbear flake8-deprecated flake8-executable isort pylint
+            pip install dlint flake8 flake8-bandit flake8-bugbear flake8-deprecated flake8-executable pylint
 
       - name: isort
         if: github.event.pull_request.head.repo.full_name == github.repository
@@ -68,9 +68,6 @@ jobs:
       - name: Flake8 Code Linter
         run: |
             flake8 $SRC_FOLDER --max-line-length=120 --extend-ignore=E203
-      - name: isort
-        run: |
-            isort **/*.py
       - name: Pylint Code Linter
         run: |
             pylint --disable=C,R  --enable=unidiomatic-typecheck $SRC_FOLDER
