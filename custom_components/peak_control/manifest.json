@@ -5,5 +5,5 @@
   "requirements": [],
   "codeowners": [],
   "iot_class": "local_polling",
-  "loggers": []
+  "version": 0.0.1
 }
