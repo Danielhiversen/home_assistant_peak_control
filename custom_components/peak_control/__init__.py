@@ -1,4 +1,4 @@
-"""light trigger component."""
+"""Peak control."""
 import logging
 from datetime import timedelta
 
@@ -8,6 +8,7 @@ from homeassistant.const import (
     EVENT_HOMEASSISTANT_START,
     SERVICE_TURN_OFF,
     SERVICE_TURN_ON,
+    STATE_OFF,
 )
 from homeassistant.core import callback
 from homeassistant.helpers.event import (
@@ -46,28 +47,50 @@ def setup(hass, config):
 
     async def _async_initialize(_=None):
         """Get the cache data."""
+        async_track_state_change(
+            hass, config[DOMAIN]["estimated_hourly_consumtion_sensor"], _activate
+        )
+        async_track_state_change(
+            hass, config[DOMAIN]["max_hourly_consumption"], _activate
+        )
+
+        nonlocal store
         store = hass.helpers.storage.Store(1, DOMAIN)
         hass.data[STOPPED_DEVICES] = await store.async_load()
+        if hass.data[STOPPED_DEVICES] is None:
+            hass.data[STOPPED_DEVICES] = {}
+        print("STOPPED_DEVICES", hass.data[STOPPED_DEVICES])
 
     @callback
     def _data_to_save():
         """Return data of entity map to store in a file."""
+        print(hass.data[STOPPED_DEVICES])
         return hass.data[STOPPED_DEVICES]
 
-    async def _activate(_, __, new_state):
+    async def _activate(entity_id, old_state, new_state):
+        try:
+            est_hour_cons = float(new_state.state)
+        except ValueError:
+            return
+
+        try:
+            max_cons = float(hass.states.get(config[DOMAIN]["max_hourly_consumption"]).state)
+            max_cons = 6.0
+        except ValueError:
+            return
+        except AttributeError:
+            _LOGGER.error("No state found for %s", config[DOMAIN]["max_hourly_consumption"], exc_info=True)
+            raise
 
         now = dt_util.now()
-        if now.minute < 10:
+        if now.minute < 5 and not hass.data[STOPPED_DEVICES]:
             return
 
         nonlocal last_update
         if (now - last_update) < timedelta(minutes=1):
             return
 
-        est_total_cons = float(new_state.state)
-
-        max_cons = hass.states.get(config[DOMAIN]["max_hourly_consumption"]).state
-        _LOGGER.debug("%s %s %s", float(new_state.state), est_total_cons, max_cons)
+        _LOGGER.debug("%s %s %s", float(new_state.state), est_hour_cons, max_cons)
 
         last_update = now
 
@@ -78,17 +101,19 @@ def setup(hass, config):
             factor = 0.90
 
         # Restore
-        if est_total_cons < factor * max_cons and hass.data[STOPPED_DEVICES]:
-            for entity_id in devices:
+        print(est_hour_cons, factor, max_cons, hass.data[STOPPED_DEVICES])
+        if est_hour_cons < factor * max_cons and hass.data[STOPPED_DEVICES]:
+            for entity_id in devices[::-1]:
                 if entity_id not in hass.data[STOPPED_DEVICES]:
                     continue
+
                 state = hass.data[STOPPED_DEVICES].pop(entity_id)
 
                 _LOGGER.debug("Restore %s", entity_id)
                 if "climate" in entity_id:
                     _data = {
                         "entity_id": entity_id,
-                        "temperature": int(float(state.attributes.get("temperature"))),
+                        "temperature": int(float(state)),
                     }
                     await hass.services.async_call(
                         "climate", "set_temperature", _data, blocking=False
@@ -96,20 +121,18 @@ def setup(hass, config):
 
                 elif "switch" in entity_id or "input_boolean" in entity_id:
                     _data = {"entity_id": entity_id}
-                    service = (
-                        SERVICE_TURN_ON if state.state == "on" else SERVICE_TURN_OFF
-                    )
                     await hass.services.async_call(
-                        "switch", service, _data, blocking=False
+                        "homeassistant", SERVICE_TURN_ON, _data, blocking=False
                     )
 
                 store.async_delay_save(_data_to_save, 10)
                 return
-
-        if est_total_cons < max_cons:
             return
 
-        # turn down
+        if est_hour_cons < factor * max_cons:
+            return
+
+        # Turn down
         for entity_id in devices:
             if entity_id in hass.data[STOPPED_DEVICES]:
                 continue
@@ -117,25 +140,25 @@ def setup(hass, config):
             _LOGGER.debug("Turn down %s", entity_id)
             if "climate" in entity_id:
                 _data = {"entity_id": entity_id, "temperature": 10}
-                hass.data[STOPPED_DEVICES][entity_id] = hass.states.get(entity_id)
+                print(hass.states.get(entity_id).attributes.get("min_temp", 10))
+                hass.data[STOPPED_DEVICES][entity_id] = hass.states.get(entity_id).attributes.get("temperature")
                 await hass.services.async_call(
                     "climate", "set_temperature", _data, blocking=False
                 )
-                hass.data[STOPPED_DEVICES][entity_id] = hass.states.get(entity_id)
 
             elif "switch" in entity_id or "input_boolean" in entity_id:
+                state = hass.states.get(entity_id).state
+                if state == STATE_OFF:
+                    continue
                 _data = {"entity_id": entity_id}
-                hass.data[STOPPED_DEVICES][entity_id] = hass.states.get(entity_id)
+                hass.data[STOPPED_DEVICES][entity_id] = state
                 await hass.services.async_call(
-                    "switch", SERVICE_TURN_OFF, _data, blocking=False
+                    "homeassistant", SERVICE_TURN_OFF, _data, blocking=False
                 )
 
             store.async_delay_save(_data_to_save, 10)
             return
 
-    async_track_state_change(
-        hass, config[DOMAIN]["estimated_hourly_consumtion_sensor"], _activate
-    )
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_START, _async_initialize)
 
     return True
